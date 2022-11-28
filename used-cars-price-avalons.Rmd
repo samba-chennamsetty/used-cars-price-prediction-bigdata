@@ -1,0 +1,346 @@
+---
+title: "Used-Cars-Price-Prediction - Avalons"
+author: 
+  - Samba Chennamsetty, chennamsettys@mail.sacredheart.edu
+  - Shaik Arif Pasha, shaiks11@mail.sacredheart.edu
+  - Jagadishwar Reddy Velma, velmaj@mail.sacredheart.edu
+output: 
+  html_document:
+    toc: true
+    code_folding: hide
+    toc_depth: 2
+---
+<p style="font-family: calibri, serif; font-size:11pt; font-style:italic">
+
+![Used Cars Inventory.](UsedCars.png)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+```
+```{r}
+library(tidyverse)
+```
+## Introduction
+
+In this project we will explore the data set of Car Dekho. The data set is about second hand cars and various features of the Cars. The project will contain an Exploratory Data analysis, a Regression Model and Finally a Simple Supervised Machine Learning Model.
+
+
+```{r warning=FALSE}
+df = read_csv("car_details.csv")
+df
+```
+
+## Data cleaning
+
+Car Dekho is company which deals in used cars, this data have information about all the cars which are offered or registered in the portal to be sold. The data have various information like name of the car, Kilometer driven, mileage, engine power,age of the car etc. In this section using various function of tidyverse package we have cleaned the data. Numbers are extracted detaching them from their unit and also outliers are filtered. 
+Using the *parse_number* function the numbers has been detached and with the use of *mutate* the parsed number is stored in a separate column. *filter* function is used to get rid of NULL values, 0 values and some outliers. The logical operators used in filter is according to the need of the data. 
+
+```{r warning=FALSE}
+df1 = df %>%
+mutate(eng_pow = parse_number(engine),
+      mil_num = parse_number(mileage),
+      max_pow = parse_number(max_power),
+      age= 2021-as.numeric(year)) %>%
+mutate(Com = word(name,1))%>%
+filter(!is.na(mil_num),
+       !is.na(eng_pow),
+      !is.na(max_pow),
+      !mil_num == 0,
+      !eng_pow == 0,
+      !max_pow == 0,
+      km_driven<550000,
+      mil_num<35)
+df1
+summary(df1)
+```
+
+## Data Visualization
+
+Based on the summary we will be doing the EDA and will make some insight about the data. But before that in the following lines of code we have defined a customised theme for the following plots.
+
+```{r warning=FALSE}
+theme_method = function(){ 
+    font = "Times New Roman"   
+    
+    theme_minimal() %+replace%  
+    
+    theme(
+      panel.background = element_rect(fill = "white", 
+            colour = NA), panel.border = element_rect(fill = NA, 
+            colour = "grey20"), panel.grid = element_line(colour = "grey92"), 
+            panel.grid.minor = element_line(size = rel(0.5)), 
+            strip.background = element_rect(fill = "grey85", 
+                colour = "grey20"), legend.key = element_rect(fill = "white", 
+                colour = NA), complete = TRUE,          
+
+      plot.title = element_text(             
+                   family = font,            
+                   size = 18,                
+                   face = 'bold.italic',            
+                   color = '#4040bf'),               
+      
+      plot.subtitle = element_text(          
+                   family = font,            
+                   size = 14,
+                   color = '#8080ff'),               
+      
+      plot.caption = element_text(           
+                   family = font,            
+                   size = 9,                
+                   hjust = 1,
+                   color = 'red'),               
+      
+      axis.title = element_text(             
+                   family = font,            
+                   size = 13,
+                   color = '#331a00'),               
+      
+      axis.text = element_text(              
+                   family = font,            
+                   size = 9,
+                   color = 'black'),                
+      
+      axis.text.x = element_text(margin=margin(10, b = 10)))
+    }
+```
+
+##### 1: This graph will show how the type of fuel affects the milage and Maximum Power of the Cars.  
+
+```{r warning=FALSE}
+df1%>%
+filter(max_pow<300)%>%
+ggplot()+geom_point(aes(x=mil_num,y=max_pow,color = fuel))+ 
+labs(title = 'Comparison of Mileage and Maximum Power ',
+     subtitle = 'With respect to Fuel Type',
+    x= 'Mileage in kmpl',
+    y='Maximum Power of Engine in brake Horse Power',
+    caption = ' ')+
+theme_method()
+```
+
+In this graph, we have a scatter plot where Mileage is on the x-axis and Engine power is on the y axis. Then the points have been classified based on the fuel type of the cars. A cluster of petrol cars is found in the 15 to 20 kmpl mileage, whereas no such cluster is found for diesel cars. LPG cars are of low Mileage and low Engine power, and in contrast to that, cars having CNG as fuel are of excellent efficiency. Cars with CNG have the highest Mileage. LPG found to be a more inefficient mode of fuel, but it could be cost-effective in real life, which is the limitation of the data. 
+
+##### 2: Box plot denoting the variation in selling price according to the fuel type of the cars.
+
+```{r warning=FALSE}
+options(warn=-1)
+df1 %>%
+filter(selling_price<700000,
+       km_driven<700000)%>%
+ggplot(aes(x=fuel,y=selling_price,fill=fuel))+
+geom_boxplot(show.legend = FALSE)+
+stat_summary(fun="mean",show.legend = FALSE)+
+labs(title = 'Distribution of Selling Price',
+    subtitle = 'According to Fuel Type',
+    x= 'Fuel Type',
+    y='Selling Price',
+    caption = ' ')+
+theme_method()
+
+```
+
+Here in the diagram we can we have the Box plot of the distribution of selling price along with Fuel Type. As we all know the lower horizontal side of the box tells us about first quartile and the upper side shows third quartile. The line in between shows the median of the distribution. Along with that using *stat_summary*, the mean value of each class are plotted as a point. From the distribution it is clear that the on an average the selling price of LPG car is the lowest, whereas the Concentration of Diesel car is at higher selling price section. For Petrol cars we can observe that the mean value of the cars is higher than the middle most value. We can say that the distribution is positively skewed which means there are less number of cars with very high selling price. For Diesel car the distribution is almost symmetric. 
+
+```{r warning=FALSE}
+options(warn=-1)
+df1 %>%
+ggplot(aes(x=mil_num,fill=fuel))+
+geom_density(alpha = 0.7)+
+labs(title = 'Distribution of Mileage',
+    subtitle = 'According to Fuel Type',
+    x= 'Mileage',
+    y='',
+    caption = ' ')+
+theme_method()
+```
+
+##### 3: Box plot showing distribution of Cars along with selling price considering owner as a factor. 
+
+```{r warning=FALSE}
+df_f=df1 %>%
+filter(selling_price<700000,
+       km_driven<700000)
+df_f$owner=factor(df_f$owner,levels=c('First Owner','Second Owner','Third Owner','Fourth & Above Owner'))
+ggplot(data=df_f,aes(x=owner,y=selling_price,fill=owner))+
+geom_boxplot(show.legend = FALSE)+
+stat_summary(fun="mean",show.legend = FALSE)+
+labs(title = 'Distribution of Selling Price',
+    subtitle = 'According to Owner Type',
+    x= 'Owner Type',
+    y='Selling Price',
+    caption = ' ')+
+theme_method()
+```
+
+This diagram shows the distribution of seling price depending upon the fuel type of the cars. This diagram shows the reality that New cars have higher selling price. But apart from that one intersting point to note here is that with increasing number of owners the distribution of cars according to selling price changed its skewness. From slightly negetive skewness in First Owner, the skewness became gradually positive and it is the highest for Fourth and above owner. In simple words with increasing number of owners Costly cars became less in the market, which actually shows the main concept that with increasing number of Owner price decreases.
+
+##### 4: Histogram Depicting the Distribution of Cars over age of it.
+
+```{r warning=FALSE}
+df1%>%
+group_by(age)%>%
+count()%>%
+ggplot()+geom_col(aes(y=n,x=age))+
+labs(title = 'Age Distribution of Cars at the time of Selling',
+     subtitle= 'Calculated in 2021',
+    x= 'Age of Car',
+    y='#Cars',
+    caption = '')+
+theme_method()
+```
+
+This bar diagram will show the distribution of Nature of Ownership based on Fuel Type.
+
+```{r warning=FALSE}
+df1 %>%
+filter(fuel == c('Diesel','Petrol'))%>%
+ggplot()+geom_bar(aes(x=fuel, fill = owner, order = owner))+
+labs(title = 'Distribution of Owner by Fuel Type',
+    x= 'Fuel',
+    y='Number of Cars',
+    caption = ' ')+theme_method()
+```
+This diagram will help in determing how fuel type can influence Engine Power. Along with that there is a high probability of the  collinearity in the case of regression model.
+
+```{r warning=FALSE}
+df1%>%
+filter(max_pow<300)%>%
+ggplot()+geom_point(aes(x=eng_pow,y=max_pow,color=fuel))+
+labs(title = 'Relation among Engine Power,Maximum Power',
+     subtitle = 'With respect to fuel type',
+    x= 'Enging Power (bhp)',
+    y='Maximum Power',
+    caption = ' ')+theme_method()
+```
+Distribution of Major Companies in second hand Market.
+
+
+```{r warning=FALSE}
+df1%>%
+group_by(Com)%>%
+count()%>%
+arrange(desc(n))%>%
+filter(n>90)%>%
+ggplot()+geom_col(aes(x=n,y=reorder(Com,n),fill=Com),show.legend = FALSE)+
+geom_label(aes(y = reorder(Com,n), x = n, label = paste(round((n/sum(n))*100,2),'%')))+
+labs(title = 'Percentage share of Brands',
+     subtitle = '',
+    x= 'Percentage Share',
+    y='Company',
+    caption = ' ')+
+theme_method()
+```
+## Regression Model
+Dummy Variable Creation
+
+```{r warning=FALSE}
+library(dummy)
+library(fastDummies)
+df2=dummy_cols(df1[,c(5,6,7,8)],remove_first_dummy=TRUE)
+#df2
+```
+Combining the Dummy Variable table with Main data frame.
+
+
+```{r warning=FALSE}
+df3=cbind(df1,df2[,5:14])
+#names(df3)
+#df3
+```
+Regression Analysis
+
+
+```{r warning=FALSE}
+df4=df3[,c(3:4,15:17,19:28)]
+#names(df4)
+lm2=lm(log(selling_price) ~.,data=df4)
+summary(lm2)
+```
+
+
+```{r warning=FALSE}
+(summary(lm2)$coefficient)
+```
+
+## Regression Diagnostic Test
+
+```{r warning=FALSE}
+plot(lm2)
+```
+In an ideal and unbiased regression, the red lines in the first and third diagram should have been parallel to x axis. So, these two results are more or less acceptable. In the second diagram for ideal regression the points should lie on the diagonal line, our result is also not that bad to reject the model.
+
+
+```{r warning=FALSE}
+#library(corpcor)
+#cor2pcor(cov(df4))
+```
+## Test of Multicollinearity
+
+
+```{r warning=FALSE}
+library(car)
+data.frame(vif(lm2))
+```
+According to the rule of thumb of the value VIF we know that, A VIF value of greater than 10 signifies that the amount of Multicollinearity can cost some problem to the data set. In our analysis we can find that only Fuel Type Petrol and Fuel Type Diesel are crossing the limit 10. Apart from that other variables are not showing some significant problem. From the formula of VIF we know that the minimum value of VIF is 1 and for this data set most of the values are close to 1. 
+
+A solution to this problem could be dropping of the Fuel variable as it is making some disturbances in the Model.
+
+
+## Test of Autocorrelation
+```{r warning=FALSE}
+library(lmtest)
+dwtest(lm2)
+```
+Here we have got a very good result of Durbin Watson Test, The value we got is 1.869 which is close to 2. Though the value is slightly towards the side of Positive Auto correlation it can be considered perfect for this model. Since it is not a time series data data there is very less probability that it will have the Problem of Auto Correlation. 
+
+```{r warning=FALSE}
+bgtest(lm2)
+```
+
+## Test of Homoscedasticity
+```{r warning=FALSE}
+bptest(lm2)
+```
+
+
+```{r warning=FALSE}
+#names(df4)
+library(GGally)
+library(grid)
+ggscatmat(df1, columns = c(4,15,16), color = "transmission")
+```
+
+
+```{r warning=FALSE}
+ggcorr(df4[2:4])
+```
+## Supervised ML
+
+Here in this set of codes a Supervised Machine Learning Model is formed. 90% of the whole data set is taken as Test data using sampling. The model is similar with the previous regression model. The output shows the mean squared error. And the Plot shows how the error terms are distributed.
+
+```{r warning=FALSE}
+split_size = 0.9
+sample_size = floor(split_size * nrow(df4))
+set.seed(2037001)
+train_indices = sample(seq_len(nrow(df4)), size = sample_size)
+train = df4[train_indices,]
+test = df4[-train_indices,]
+model2= lm(selling_price ~.,data=train)
+#summary(model2)
+#View(train)
+new.data = test[,-1]
+test$output = predict(model2, new.data)
+#test$output
+sqrt(sum(test$selling_price - test$output)^2/nrow(test))
+plot(test$selling_price - test$output)
+```
+
+
+```{r warning=FALSE}
+names(df1)
+```
+
+
+```{r warning=FALSE}
+str(df1)
+```
+</p>
